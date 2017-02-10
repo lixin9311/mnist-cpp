@@ -266,6 +266,16 @@ mat<M, N> operator*(real k, mat<M, N> a) {
    mat<3,5> c = a * b;
  */
 
+template <int M, int N>
+static inline void merge(mat<M, N> c1, mat<M, N> c2, mat<M, N> c, long i0,
+                         long i1, long j0, long j1) {
+  for (long i = i0; i < i1; i++) {
+    for (long j = j0; j < j1; j += 8) {
+      c.v(i, j) += c1.v(i, j) + c2.v(i, j);
+    }
+  }
+}
+// 0.20679681
 #define DATA_SIZE i_size* k_size + k_size* j_size + i_size* j_size
 template <int M, int N, int K>
 static inline void mulMatMat(mat<M, K> a, mat<K, N> b, mat<M, N> c, long i0,
@@ -288,8 +298,13 @@ static inline void mulMatMat(mat<M, K> a, mat<K, N> b, mat<M, N> c, long i0,
     tg.wait();
   } else if (k_size > V2) {
     long k_split = k0 + k_size / 8 / 2 * 8;
-    mulMatMat(a, b, c, i0, i1, j0, j1, k0, k_split);
-    mulMatMat(a, b, c, i0, i1, j0, j1, k_split, k1);
+    mat<M, N> c1(c.m);
+    mat<M, N> c2(c.m);
+    c1.zero();
+    c2.zero();
+    mulMatMat(a, b, c1, i0, i1, j0, j1, k0, k_split);
+    mulMatMat(a, b, c2, i0, i1, j0, j1, k_split, k1);
+    merge(c1, c2, c, i0, i1, j0, j1);
   } else {
     long j_reduced = j1 - (j1 - j0) % 64;
     __m256 buff[8][8];
